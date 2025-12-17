@@ -1,0 +1,123 @@
+/* Shutter Flash Animation */
+@keyframes shutterFlash {
+  0% {
+    opacity: 0;
+  }
+  10% {
+    opacity: 0.8;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
+.shutter-flash.active {
+  animation: shutterFlash 300ms ease-out;
+}
+
+/* Button Press Animation */
+.button-press {
+  animation: buttonPress 200ms ease;
+}
+
+@keyframes buttonPress {
+  0% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(0.95);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+/* Fade In Animation */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.fade-in {
+  animation: fadeIn 300ms ease;
+}
+
+/* Slide Up Animation */
+@keyframes slideUp {
+  from {
+    transform: translateY(20px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+.slide-up {
+  animation: slideUp 300ms ease;
+}
+
+/* Pulse Animation */
+@keyframes pulse {
+  0% {
+    box-shadow: 0 0 0 0 rgba(255, 255, 255, 0.4);
+  }
+  70% {
+    box-shadow: 0 0 0 10px rgba(255, 255, 255, 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(255, 255, 255, 0);
+  }
+}
+
+.pulse {
+  animation: pulse 2s infinite;
+}
+
+/* Camera Switch Animation */
+@keyframes cameraSwitch {
+  0% {
+    opacity: 0;
+  }
+  50% {
+    opacity: 0.5;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
+.camera-switch-animation.active {
+  animation: cameraSwitch 500ms ease;
+}
+
+/* Loading Spinner Variations */
+.spinner-fast {
+  animation: spin 0.6s linear infinite;
+}
+
+.spinner-slow {
+  animation: spin 2s linear infinite;
+}
+
+/* Menu Item Animation */
+.menu-item {
+  animation: slideUp 300ms ease;
+  animation-fill-mode: both;
+}
+
+.menu-item:nth-child(1) { animation-delay: 50ms; }
+.menu-item:nth-child(2) { animation-delay: 100ms; }
+.menu-item:nth-child(3) { animation-delay: 150ms; }
+.menu-item:nth-child(4) { animation-delay: 200ms; }
+.menu-item:nth-child(5) { animation-delay: 250ms; }
+
+/* Aspect Ratio Change Animation */
+.aspect-ratio-change {
+  transition: all 0.3s cubic-bezier(0.4, 0.0, 0.2, 1);
+}
