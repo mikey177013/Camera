@@ -22,9 +22,6 @@ class OverlayManager {
         this.overlayPositions = new Map(); // Store positions per overlay
         this.overlayOpacity = 0.7;
         
-        // Gesture handling
-        this.isGestureActive = false;
-        
         this.setupEventListeners();
     }
 
@@ -37,6 +34,15 @@ class OverlayManager {
         
         // Load saved overlay positions
         await this.loadOverlayPositions();
+        
+        // Load saved opacity
+        const savedOpacity = await this.storage.getLocal('overlayOpacity');
+        if (savedOpacity) {
+            this.overlayOpacity = savedOpacity;
+            if (this.renderer && this.renderer.ctx) {
+                this.renderer.ctx.globalAlpha = this.overlayOpacity;
+            }
+        }
         
         console.log('Overlay manager initialized');
     }
@@ -107,13 +113,15 @@ class OverlayManager {
             }
             
             // Apply saved opacity
-            this.renderer.ctx.globalAlpha = this.overlayOpacity;
+            if (this.renderer && this.renderer.ctx) {
+                this.renderer.ctx.globalAlpha = this.overlayOpacity;
+            }
             
             // Update UI
             this.updateUI();
             
             // Show controls hint
-            this.showToast(`Active: ${overlay.name}. Drag to move, pinch to zoom.`);
+            this.showToast(`Active: ${overlay.name}. Drag to reposition guide.`);
             
             console.log(`Active overlay: ${overlay.name}`);
         }
@@ -123,6 +131,7 @@ class OverlayManager {
         this.activeOverlay = null;
         this.renderer.clear();
         this.updateUI();
+        this.showToast('Composition guide cleared');
         console.log('Overlay cleared');
     }
 
@@ -133,10 +142,10 @@ class OverlayManager {
             this.setActiveOverlay(overlay.id);
             this.updateUI();
             
-            this.showToast('Overlay uploaded successfully');
+            this.showToast('Custom grid uploaded successfully');
         } catch (error) {
             console.error('Failed to upload overlay:', error);
-            this.showToast('Failed to upload overlay');
+            this.showToast('Failed to upload grid');
         }
     }
 
@@ -144,7 +153,7 @@ class OverlayManager {
         // Don't delete built-in overlays
         const overlay = this.overlays.find(o => o.id === overlayId);
         if (overlay && overlay.type === 'builtin') {
-            this.showToast('Cannot delete built-in overlays');
+            this.showToast('Cannot delete built-in guides');
             return;
         }
         
@@ -164,10 +173,10 @@ class OverlayManager {
             }
             
             this.updateUI();
-            this.showToast('Overlay deleted');
+            this.showToast('Custom grid deleted');
         } catch (error) {
             console.error('Failed to delete overlay:', error);
-            this.showToast('Failed to delete overlay');
+            this.showToast('Failed to delete grid');
         }
     }
 
@@ -176,82 +185,12 @@ class OverlayManager {
         this.previewWidth = width;
         this.previewHeight = height;
         
-        if (this.activeOverlay) {
+        if (this.activeOverlay && this.renderer) {
             this.renderer.updateSize(width, height);
         }
     }
 
-    async drawOverlayOnPhoto(ctx, photoWidth, photoHeight) {
-        if (!this.activeOverlay || !this.renderer.overlayImage) return;
-        
-        try {
-            const overlayData = this.activeOverlay.type === 'builtin' 
-                ? this.activeOverlay.data 
-                : await this.loadOverlayImage(this.activeOverlay.url);
-            
-            if (overlayData) {
-                // Get current transform from renderer
-                const transform = this.renderer.getPosition();
-                
-                // Calculate base dimensions maintaining aspect ratio
-                const imgAspect = overlayData.width / overlayData.height;
-                const photoAspect = photoWidth / photoHeight;
-                
-                let baseWidth, baseHeight;
-                
-                if (photoAspect > imgAspect) {
-                    // Photo is wider than overlay
-                    baseHeight = photoHeight;
-                    baseWidth = baseHeight * imgAspect;
-                } else {
-                    // Photo is taller than overlay
-                    baseWidth = photoWidth;
-                    baseHeight = baseWidth / imgAspect;
-                }
-                
-                // Apply scale
-                const scaledWidth = baseWidth * transform.scale;
-                const scaledHeight = baseHeight * transform.scale;
-                
-                // Calculate center position
-                const centerX = (photoWidth - scaledWidth) / 2;
-                const centerY = (photoHeight - scaledHeight) / 2;
-                
-                // Apply offsets (scale offsets to photo dimensions)
-                const scaleFactorX = photoWidth / this.previewWidth;
-                const scaleFactorY = photoHeight / this.previewHeight;
-                const offsetX = transform.offsetX * scaleFactorX;
-                const offsetY = transform.offsetY * scaleFactorY;
-                
-                const drawX = centerX + offsetX;
-                const drawY = centerY + offsetY;
-                
-                // Save context state
-                ctx.save();
-                
-                // Move to center for rotation
-                ctx.translate(drawX + scaledWidth / 2, drawY + scaledHeight / 2);
-                
-                // Apply rotation
-                ctx.rotate(transform.rotation * Math.PI / 180);
-                
-                // Draw overlay with opacity
-                ctx.globalAlpha = this.overlayOpacity;
-                ctx.drawImage(
-                    overlayData,
-                    -scaledWidth / 2,
-                    -scaledHeight / 2,
-                    scaledWidth,
-                    scaledHeight
-                );
-                
-                // Restore context
-                ctx.restore();
-            }
-        } catch (error) {
-            console.error('Failed to draw overlay on photo:', error);
-        }
-    }
+    // REMOVED: drawOverlayOnPhoto method - overlays are not included in photos
 
     async loadOverlayImage(url) {
         return new Promise((resolve, reject) => {
@@ -350,40 +289,6 @@ class OverlayManager {
 
     getOverlayOpacity() {
         return this.overlayOpacity;
-    }
-
-    // Gesture handling
-    startGesture() {
-        this.isGestureActive = true;
-        // Disable other UI elements during gesture
-        this.disableCameraControls();
-    }
-
-    endGesture() {
-        this.isGestureActive = false;
-        // Re-enable other UI elements
-        this.enableCameraControls();
-        
-        // Save position
-        if (this.activeOverlay) {
-            this.saveCurrentOverlayPosition();
-        }
-    }
-
-    disableCameraControls() {
-        const shutterButton = document.getElementById('shutter-button');
-        const switchButton = document.getElementById('switch-camera-button');
-        
-        if (shutterButton) shutterButton.style.pointerEvents = 'none';
-        if (switchButton) switchButton.style.pointerEvents = 'none';
-    }
-
-    enableCameraControls() {
-        const shutterButton = document.getElementById('shutter-button');
-        const switchButton = document.getElementById('switch-camera-button');
-        
-        if (shutterButton) shutterButton.style.pointerEvents = 'auto';
-        if (switchButton) switchButton.style.pointerEvents = 'auto';
     }
 
     updateUI() {
