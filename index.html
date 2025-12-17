@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <meta name="theme-color" content="#121212">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <title>Composition Camera</title>
+    
+    <!-- PWA Manifest -->
+    <link rel="manifest" href="manifest.json">
+    
+    <!-- iOS Icons -->
+    <link rel="apple-touch-icon" href="assets/icons/icon-152x152.png">
+    
+    <!-- Styles -->
+    <link rel="stylesheet" href="css/styles.css">
+    <link rel="stylesheet" href="css/camera.css">
+    <link rel="stylesheet" href="css/overlay.css">
+    <link rel="stylesheet" href="css/ui-components.css">
+    <link rel="stylesheet" href="css/animations.css">
+</head>
+<body>
+    <!-- App Container -->
+    <div id="app" class="app">
+        
+        <!-- Camera View -->
+        <div id="camera-view" class="camera-view" data-state="active">
+            
+            <!-- Top Bar -->
+            <div class="top-bar safe-area-top">
+                <button id="menu-button" class="icon-button" aria-label="Menu">
+                    <svg class="icon" viewBox="0 0 24 24">
+                        <path d="M3 18h18v-2H3v2zm0-5h18v-2H3v2zm0-7v2h18V6H3z"/>
+                    </svg>
+                </button>
+                
+                <button id="switch-camera-button" class="icon-button" aria-label="Switch Camera">
+                    <svg class="icon" viewBox="0 0 24 24">
+                        <path d="M20 4h-3.17L15 2H9L7.17 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm-5 11.5V13H9v2.5L5.5 12 9 8.5V11h6V8.5l3.5 3.5-3.5 3.5z"/>
+                    </svg>
+                </button>
+            </div>
+            
+            <!-- Camera Preview Container -->
+            <div class="camera-container">
+                <video id="camera-preview" class="camera-preview" autoplay playsinline muted></video>
+                <canvas id="overlay-canvas" class="overlay-canvas"></canvas>
+                <div id="shutter-flash" class="shutter-flash"></div>
+            </div>
+            
+            <!-- Bottom Bar -->
+            <div class="bottom-bar safe-area-bottom">
+                <div class="aspect-ratio-selector">
+                    <button class="aspect-ratio-btn" data-ratio="1:1">1:1</button>
+                    <button class="aspect-ratio-btn active" data-ratio="4:3">4:3</button>
+                    <button class="aspect-ratio-btn" data-ratio="16:9">16:9</button>
+                </div>
+                
+                <button id="shutter-button" class="shutter-button" aria-label="Take Photo">
+                    <div class="shutter-outer">
+                        <div class="shutter-inner"></div>
+                    </div>
+                </button>
+            </div>
+            
+        </div>
+        
+        <!-- Menu Overlay -->
+        <div id="menu-overlay" class="menu-overlay" data-state="hidden">
+            <div class="menu-header safe-area-top">
+                <h2 class="menu-title">Composition Camera</h2>
+                <button id="close-menu" class="icon-button" aria-label="Close Menu">
+                    <svg class="icon" viewBox="0 0 24 24">
+                        <path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/>
+                    </svg>
+                </button>
+            </div>
+            
+            <div class="menu-content">
+                <div class="menu-section">
+                    <h3 class="menu-section-title">Overlays</h3>
+                    
+                    <div class="overlay-list" id="overlay-list">
+                        <!-- Overlay items will be populated here -->
+                    </div>
+                    
+                    <button id="upload-overlay" class="menu-button">
+                        <svg class="icon" viewBox="0 0 24 24">
+                            <path d="M19.35 10.04C18.67 6.59 15.64 4 12 4 9.11 4 6.6 5.64 5.35 8.04 2.34 8.36 0 10.91 0 14c0 3.31 2.69 6 6 6h13c2.76 0 5-2.24 5-5 0-2.64-2.05-4.78-4.65-4.96zM14 13v4h-4v-4H7l5-5 5 5h-3z"/>
+                        </svg>
+                        <span>Upload Custom Overlay</span>
+                    </button>
+                    
+                    <button id="clear-overlay" class="menu-button">
+                        <svg class="icon" viewBox="0 0 24 24">
+                            <path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/>
+                        </svg>
+                        <span>Clear Active Overlay</span>
+                    </button>
+                </div>
+                
+                <div class="menu-section">
+                    <h3 class="menu-section-title">About</h3>
+                    <p class="menu-description">
+                        Composition Camera helps you frame better photos using composition guides.
+                        Upload your own PNG overlays or use built-in guides.
+                    </p>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Hidden File Input for Overlay Upload -->
+        <input type="file" id="overlay-file-input" accept=".png" style="display: none;">
+        
+        <!-- Loading Indicator -->
+        <div id="loading" class="loading-overlay">
+            <div class="spinner"></div>
+            <p>Initializing camera...</p>
+        </div>
+        
+    </div>
+
+    <!-- Scripts -->
+    <script src="js/app/main.js" type="module"></script>
+</body>
+</html>
