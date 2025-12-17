@@ -10,7 +10,7 @@ class CameraController {
         this.overlayManager = null;
         
         this.videoElement = document.getElementById('camera-preview');
-        this.aspectRatio = '4:3';
+        this.currentAspectRatio = '4:3';
         this.currentCamera = 'environment';
         
         this.bindEvents();
@@ -35,7 +35,7 @@ class CameraController {
             this.cameraSwitch.init();
             
             // Set default aspect ratio
-            this.setAspectRatio(this.aspectRatio);
+            this.setAspectRatio(this.currentAspectRatio);
             
             console.log('Camera controller initialized');
         } catch (error) {
@@ -50,37 +50,41 @@ class CameraController {
     }
 
     setAspectRatio(ratio) {
-        this.aspectRatio = ratio;
+        this.currentAspectRatio = ratio;
         
         // Calculate and apply crop to video element
         const container = this.videoElement.parentElement;
         const containerWidth = container.clientWidth;
         const containerHeight = container.clientHeight;
         
-        let width, height;
         const [w, h] = ratio.split(':').map(Number);
         const targetRatio = w / h;
         const containerRatio = containerWidth / containerHeight;
         
+        let width, height;
+        
         if (containerRatio > targetRatio) {
-            // Container is wider than target ratio
+            // Container is wider than target - black bars on sides
             height = containerHeight;
             width = height * targetRatio;
         } else {
-            // Container is taller than target ratio
+            // Container is taller than target - black bars on top/bottom
             width = containerWidth;
             height = width / targetRatio;
         }
         
         this.videoElement.style.width = `${width}px`;
         this.videoElement.style.height = `${height}px`;
+        this.videoElement.style.left = `${(containerWidth - width) / 2}px`;
+        this.videoElement.style.top = `${(containerHeight - height) / 2}px`;
+        this.videoElement.style.position = 'absolute';
         
         // Update overlay if exists
         if (this.overlayManager) {
             this.overlayManager.updateAspectRatio(ratio, width, height);
         }
         
-        console.log(`Aspect ratio changed to ${ratio}`);
+        console.log(`Aspect ratio changed to ${ratio} (${width}x${height})`);
     }
 
     async toggleCamera() {
@@ -126,6 +130,10 @@ class CameraController {
             detail: { message }
         });
         document.dispatchEvent(event);
+    }
+
+    getCurrentAspectRatio() {
+        return this.currentAspectRatio;
     }
 
     getCurrentStream() {
