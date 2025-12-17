@@ -94,7 +94,7 @@ class UIController {
         controls.className = 'overlay-controls';
         controls.innerHTML = `
             <div class="overlay-controls-header">
-                <span>Overlay Controls</span>
+                <span>Composition Guide Controls</span>
                 <button id="close-overlay-controls" class="icon-button small">
                     <svg class="icon" viewBox="0 0 24 24">
                         <path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/>
@@ -127,15 +127,16 @@ class UIController {
                         <svg class="icon" viewBox="0 0 24 24">
                             <path d="M18 8h-1V6c0-2.76-2.24-5-5-5S7 3.24 7 6v2H6c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V10c0-1.1-.9-2-2-2zm-6 9c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2zm3.1-9H8.9V6c0-1.71 1.39-3.1 3.1-3.1 1.71 0 3.1 1.39 3.1 3.1v2z"/>
                         </svg>
-                        Lock Overlay
+                        Lock Guide
                     </button>
                 </div>
-                <div class="hint-text">
-                    <p>• Drag to move overlay</p>
-                    <p>• Pinch to zoom overlay</p>
-                    <p>• Two-finger rotate to rotate</p>
-                    <p>• Double-click to reset</p>
-                    <p>• Wheel to zoom (desktop)</p>
+                <div class="guide-disclaimer">
+                    <p>💡 <strong>Composition Guide Controls:</strong></p>
+                    <p>• Drag to reposition guide</p>
+                    <p>• Pinch to resize guide</p>
+                    <p>• Two-finger rotate guide</p>
+                    <p>• Double-click to reset guide</p>
+                    <p>• <strong>Guide is NOT saved with photos</strong></p>
                 </div>
             </div>
         `;
@@ -206,13 +207,13 @@ class UIController {
             canvas.style.cursor = draggable ? 'grab' : 'default';
         }
         
-        this.showToast(draggable ? 'Overlay dragging enabled' : 'Overlay dragging disabled');
+        this.showToast(draggable ? 'Guide dragging enabled' : 'Guide dragging disabled');
     }
 
     setOverlayOpacity(opacity) {
-        if (this.overlayManager && this.overlayManager.renderer) {
-            // Store opacity in overlay manager
+        if (this.overlayManager) {
             this.overlayManager.setOverlayOpacity(opacity);
+            this.showToast(`Guide opacity: ${Math.round(opacity * 100)}%`);
         }
     }
 
@@ -233,7 +234,7 @@ class UIController {
                 rotation: 0
             });
             
-            this.showToast('Overlay position reset');
+            this.showToast('Guide position reset');
         }
     }
 
@@ -250,9 +251,9 @@ class UIController {
                     <svg class="icon" viewBox="0 0 24 24">
                         <path d="M18 8h-1V6c0-2.76-2.24-5-5-5S7 3.24 7 6v2H6c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V10c0-1.1-.9-2-2-2zm-6 9c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2zm3.1-9H8.9V6c0-1.71 1.39-3.1 3.1-3.1 1.71 0 3.1 1.39 3.1 3.1v2z"/>
                     </svg>
-                    Lock Overlay
+                    Lock Guide
                 `;
-                this.showToast('Overlay unlocked');
+                this.showToast('Guide unlocked');
             } else {
                 // Lock
                 this.setOverlayDraggable(false);
@@ -261,9 +262,9 @@ class UIController {
                     <svg class="icon" viewBox="0 0 24 24">
                         <path d="M18 8h-1V6c0-2.76-2.24-5-5-5S7 3.24 7 6h2c0-1.66 1.34-3 3-3s3 1.34 3 3v2h1c1.1 0 2 .9 2 2v10c0 1.1.9 2 2 2H6c-1.1 0-2-.9-2-2V10c0-1.1.9-2 2-2z"/>
                     </svg>
-                    Unlock Overlay
+                    Unlock Guide
                 `;
-                this.showToast('Overlay locked');
+                this.showToast('Guide locked');
             }
         }
     }
@@ -277,6 +278,7 @@ class UIController {
         // Update UI elements during interaction
         const shutterButton = document.getElementById('shutter-button');
         const switchButton = document.getElementById('switch-camera-button');
+        const cameraContainer = document.querySelector('.camera-container');
         
         if (shutterButton) {
             shutterButton.style.opacity = isInteracting ? '0.5' : '1';
@@ -286,6 +288,14 @@ class UIController {
         if (switchButton) {
             switchButton.style.opacity = isInteracting ? '0.5' : '1';
             switchButton.style.pointerEvents = isInteracting ? 'none' : 'auto';
+        }
+        
+        if (cameraContainer) {
+            if (isInteracting) {
+                cameraContainer.classList.add('interacting');
+            } else {
+                cameraContainer.classList.remove('interacting');
+            }
         }
     }
 
@@ -314,10 +324,23 @@ class UIController {
         }
         
         hint.innerHTML = `
-            <div>X: ${Math.round(position.offsetX)}px</div>
-            <div>Y: ${Math.round(position.offsetY)}px</div>
-            <div>Scale: ${position.scale.toFixed(2)}x</div>
-            <div>Rotation: ${Math.round(position.rotation)}°</div>
+            <div class="hint-title">Guide Position</div>
+            <div class="hint-row">
+                <span>X:</span>
+                <span>${Math.round(position.offsetX)}px</span>
+            </div>
+            <div class="hint-row">
+                <span>Y:</span>
+                <span>${Math.round(position.offsetY)}px</span>
+            </div>
+            <div class="hint-row">
+                <span>Scale:</span>
+                <span>${position.scale.toFixed(2)}x</span>
+            </div>
+            <div class="hint-row">
+                <span>Rotation:</span>
+                <span>${Math.round(position.rotation)}°</span>
+            </div>
         `;
         
         hint.classList.add('visible');
