@@ -1,0 +1,30 @@
+<svg xmlns="http://www.w3.org/2000/svg" style="display: none;">
+  <defs>
+    <!-- Shutter Button Icon -->
+    <symbol id="icon-shutter" viewBox="0 0 24 24">
+      <circle cx="12" cy="12" r="10" fill="none" stroke="currentColor" stroke-width="2"/>
+      <circle cx="12" cy="12" r="8" fill="currentColor"/>
+    </symbol>
+    
+    <!-- Shutter with Inner Circle -->
+    <symbol id="icon-shutter-circle" viewBox="0 0 24 24">
+      <circle cx="12" cy="12" r="11" fill="none" stroke="currentColor" stroke-width="1.5"/>
+      <circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="1"/>
+      <circle cx="12" cy="12" r="7" fill="currentColor"/>
+    </symbol>
+    
+    <!-- Recording/Stop Icon -->
+    <symbol id="icon-shutter-recording" viewBox="0 0 24 24">
+      <circle cx="12" cy="12" r="10" fill="none" stroke="currentColor" stroke-width="2"/>
+      <rect x="8" y="8" width="8" height="8" rx="2" ry="2" fill="#ff4444"/>
+    </symbol>
+    
+    <!-- Camera Shutter (alternative) -->
+    <symbol id="icon-camera-shutter" viewBox="0 0 24 24">
+      <circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="1.5"/>
+      <circle cx="12" cy="12" r="7" fill="none" stroke="currentColor" stroke-width="1" opacity="0.7"/>
+      <circle cx="12" cy="12" r="5" fill="currentColor" opacity="0.9"/>
+      <path d="M12 7v10M7 12h10" stroke="currentColor" stroke-width="0.5" opacity="0.3"/>
+    </symbol>
+  </defs>
+</svg>
