@@ -17,6 +17,15 @@ class OverlayManager {
         this.aspectRatio = '4:3';
         this.previewWidth = 0;
         this.previewHeight = 0;
+        
+        // Overlay transformation storage
+        this.overlayPositions = new Map(); // Store positions per overlay
+        this.overlayOpacity = 0.7;
+        
+        // Gesture handling
+        this.isGestureActive = false;
+        
+        this.setupEventListeners();
     }
 
     async init() {
@@ -26,8 +35,8 @@ class OverlayManager {
         // Load built-in overlays
         await this.builtinOverlays.init();
         
-        // Setup event listeners
-        this.setupEventListeners();
+        // Load saved overlay positions
+        await this.loadOverlayPositions();
         
         console.log('Overlay manager initialized');
     }
@@ -41,7 +50,7 @@ class OverlayManager {
         
         // Set default overlay if none active
         if (!this.activeOverlay && this.overlays.length > 0) {
-            this.activeOverlay = this.overlays[0];
+            this.activeOverlay = this.overlays.find(o => o.id === 'none') || this.overlays[0];
         }
         
         this.updateUI();
@@ -61,6 +70,18 @@ class OverlayManager {
         // Clear overlay
         document.addEventListener('clearOverlay', () => {
             this.clearActiveOverlay();
+        });
+        
+        // Save overlay position when interaction ends
+        document.addEventListener('overlayInteraction', (e) => {
+            if (!e.detail.interacting && this.activeOverlay) {
+                this.saveCurrentOverlayPosition();
+            }
+        });
+        
+        // Handle aspect ratio changes
+        document.addEventListener('aspectRatioChanged', (e) => {
+            this.updateAspectRatio(e.detail.ratio, this.previewWidth, this.previewHeight);
         });
     }
 
@@ -85,8 +106,14 @@ class OverlayManager {
                 await this.renderer.setOverlay(overlay.url);
             }
             
+            // Apply saved opacity
+            this.renderer.ctx.globalAlpha = this.overlayOpacity;
+            
             // Update UI
             this.updateUI();
+            
+            // Show controls hint
+            this.showToast(`Active: ${overlay.name}. Drag to move, pinch to zoom.`);
             
             console.log(`Active overlay: ${overlay.name}`);
         }
@@ -127,6 +154,10 @@ class OverlayManager {
             // Remove from local array
             this.overlays = this.overlays.filter(o => o.id !== overlayId);
             
+            // Remove saved position
+            this.overlayPositions.delete(overlayId);
+            await this.saveOverlayPositionsToStorage();
+            
             // If active overlay was deleted, clear it
             if (this.activeOverlay && this.activeOverlay.id === overlayId) {
                 this.clearActiveOverlay();
@@ -151,30 +182,74 @@ class OverlayManager {
     }
 
     async drawOverlayOnPhoto(ctx, photoWidth, photoHeight) {
-        if (!this.activeOverlay) return;
+        if (!this.activeOverlay || !this.renderer.overlayImage) return;
         
-        const overlayData = this.activeOverlay.type === 'builtin' 
-            ? this.activeOverlay.data 
-            : await this.loadOverlayImage(this.activeOverlay.url);
-        
-        if (overlayData) {
-            const scaleInfo = this.scaling.calculateScale(
-                overlayData.width,
-                overlayData.height,
-                photoWidth,
-                photoHeight,
-                this.aspectRatio
-            );
+        try {
+            const overlayData = this.activeOverlay.type === 'builtin' 
+                ? this.activeOverlay.data 
+                : await this.loadOverlayImage(this.activeOverlay.url);
             
-            ctx.globalAlpha = 0.5; // Semi-transparent overlay
-            ctx.drawImage(
-                overlayData,
-                scaleInfo.x,
-                scaleInfo.y,
-                scaleInfo.width,
-                scaleInfo.height
-            );
-            ctx.globalAlpha = 1.0;
+            if (overlayData) {
+                // Get current transform from renderer
+                const transform = this.renderer.getPosition();
+                
+                // Calculate base dimensions maintaining aspect ratio
+                const imgAspect = overlayData.width / overlayData.height;
+                const photoAspect = photoWidth / photoHeight;
+                
+                let baseWidth, baseHeight;
+                
+                if (photoAspect > imgAspect) {
+                    // Photo is wider than overlay
+                    baseHeight = photoHeight;
+                    baseWidth = baseHeight * imgAspect;
+                } else {
+                    // Photo is taller than overlay
+                    baseWidth = photoWidth;
+                    baseHeight = baseWidth / imgAspect;
+                }
+                
+                // Apply scale
+                const scaledWidth = baseWidth * transform.scale;
+                const scaledHeight = baseHeight * transform.scale;
+                
+                // Calculate center position
+                const centerX = (photoWidth - scaledWidth) / 2;
+                const centerY = (photoHeight - scaledHeight) / 2;
+                
+                // Apply offsets (scale offsets to photo dimensions)
+                const scaleFactorX = photoWidth / this.previewWidth;
+                const scaleFactorY = photoHeight / this.previewHeight;
+                const offsetX = transform.offsetX * scaleFactorX;
+                const offsetY = transform.offsetY * scaleFactorY;
+                
+                const drawX = centerX + offsetX;
+                const drawY = centerY + offsetY;
+                
+                // Save context state
+                ctx.save();
+                
+                // Move to center for rotation
+                ctx.translate(drawX + scaledWidth / 2, drawY + scaledHeight / 2);
+                
+                // Apply rotation
+                ctx.rotate(transform.rotation * Math.PI / 180);
+                
+                // Draw overlay with opacity
+                ctx.globalAlpha = this.overlayOpacity;
+                ctx.drawImage(
+                    overlayData,
+                    -scaledWidth / 2,
+                    -scaledHeight / 2,
+                    scaledWidth,
+                    scaledHeight
+                );
+                
+                // Restore context
+                ctx.restore();
+            }
+        } catch (error) {
+            console.error('Failed to draw overlay on photo:', error);
         }
     }
 
@@ -186,6 +261,129 @@ class OverlayManager {
             img.onerror = reject;
             img.src = url;
         });
+    }
+
+    // Overlay position management
+    async saveOverlayPosition(position) {
+        if (!this.activeOverlay) return;
+        
+        const overlayId = this.activeOverlay.id;
+        this.overlayPositions.set(overlayId, {
+            ...position,
+            timestamp: Date.now()
+        });
+        
+        // Save to storage
+        await this.saveOverlayPositionsToStorage();
+        
+        // Dispatch event for UI updates
+        const event = new CustomEvent('overlayPositionChanged', {
+            detail: position
+        });
+        document.dispatchEvent(event);
+    }
+
+    async saveCurrentOverlayPosition() {
+        if (!this.activeOverlay || !this.renderer) return;
+        
+        const position = this.renderer.getPosition();
+        await this.saveOverlayPosition(position);
+    }
+
+    async loadOverlayPosition(overlayId) {
+        // Load from memory cache first
+        if (this.overlayPositions.has(overlayId)) {
+            return this.overlayPositions.get(overlayId);
+        }
+        
+        // Try to load from storage
+        try {
+            const positions = await this.storage.getLocal('overlayPositions', {});
+            return positions[overlayId];
+        } catch (error) {
+            console.error('Failed to load overlay position:', error);
+            return null;
+        }
+    }
+
+    async loadOverlayPositions() {
+        try {
+            const positions = await this.storage.getLocal('overlayPositions', {});
+            
+            // Convert to Map
+            Object.entries(positions).forEach(([id, position]) => {
+                this.overlayPositions.set(id, position);
+            });
+            
+            console.log('Loaded overlay positions:', this.overlayPositions.size);
+        } catch (error) {
+            console.error('Failed to load overlay positions:', error);
+        }
+    }
+
+    async saveOverlayPositionsToStorage() {
+        try {
+            // Convert Map to object
+            const positions = {};
+            this.overlayPositions.forEach((value, key) => {
+                positions[key] = value;
+            });
+            
+            await this.storage.setLocal('overlayPositions', positions);
+        } catch (error) {
+            console.error('Failed to save overlay positions:', error);
+        }
+    }
+
+    // Opacity control
+    setOverlayOpacity(opacity) {
+        this.overlayOpacity = Math.max(0.1, Math.min(1, opacity));
+        
+        if (this.renderer && this.renderer.ctx) {
+            this.renderer.ctx.globalAlpha = this.overlayOpacity;
+            this.renderer.render();
+        }
+        
+        // Save opacity setting
+        this.storage.setLocal('overlayOpacity', this.overlayOpacity);
+    }
+
+    getOverlayOpacity() {
+        return this.overlayOpacity;
+    }
+
+    // Gesture handling
+    startGesture() {
+        this.isGestureActive = true;
+        // Disable other UI elements during gesture
+        this.disableCameraControls();
+    }
+
+    endGesture() {
+        this.isGestureActive = false;
+        // Re-enable other UI elements
+        this.enableCameraControls();
+        
+        // Save position
+        if (this.activeOverlay) {
+            this.saveCurrentOverlayPosition();
+        }
+    }
+
+    disableCameraControls() {
+        const shutterButton = document.getElementById('shutter-button');
+        const switchButton = document.getElementById('switch-camera-button');
+        
+        if (shutterButton) shutterButton.style.pointerEvents = 'none';
+        if (switchButton) switchButton.style.pointerEvents = 'none';
+    }
+
+    enableCameraControls() {
+        const shutterButton = document.getElementById('shutter-button');
+        const switchButton = document.getElementById('switch-camera-button');
+        
+        if (shutterButton) shutterButton.style.pointerEvents = 'auto';
+        if (switchButton) switchButton.style.pointerEvents = 'auto';
     }
 
     updateUI() {
