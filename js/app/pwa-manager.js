@@ -90,4 +90,7 @@ class PWAManager {
 }
 
 export function initPWA() {
-    const pwa
+    const pwaManager = new PWAManager();
+    pwaManager.init();
+    return pwaManager;
+}
