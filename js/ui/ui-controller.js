@@ -16,6 +16,9 @@ class UIController {
         this.vibration = new Vibration();
         
         this.toastTimeout = null;
+        this.isOverlayDraggable = true; // Enable dragging by default
+        
+        this.setupOverlayInteractionEvents();
     }
 
     init() {
@@ -25,6 +28,7 @@ class UIController {
         this.orientation.init();
         
         this.setupEventListeners();
+        this.setupOverlayControls();
         console.log('UI controller initialized');
     }
 
@@ -36,6 +40,9 @@ class UIController {
     setOverlayManager(overlayManager) {
         this.overlayManager = overlayManager;
         this.menuController.setOverlayManager(overlayManager);
+        
+        // Make overlay manager globally accessible for renderer
+        window.overlayManager = overlayManager;
     }
 
     setupEventListeners() {
@@ -60,6 +67,265 @@ class UIController {
                 this.vibration.vibrate(30);
             });
         }
+        
+        // Overlay interaction events
+        document.addEventListener('overlayInteraction', (e) => {
+            this.handleOverlayInteraction(e.detail.interacting);
+        });
+    }
+
+    setupOverlayInteractionEvents() {
+        // Listen for overlay position changes
+        document.addEventListener('overlayPositionChanged', (e) => {
+            this.showPositionHint(e.detail);
+        });
+    }
+
+    setupOverlayControls() {
+        // Create overlay control panel if it doesn't exist
+        if (!document.getElementById('overlay-controls')) {
+            this.createOverlayControlPanel();
+        }
+    }
+
+    createOverlayControlPanel() {
+        const controls = document.createElement('div');
+        controls.id = 'overlay-controls';
+        controls.className = 'overlay-controls';
+        controls.innerHTML = `
+            <div class="overlay-controls-header">
+                <span>Overlay Controls</span>
+                <button id="close-overlay-controls" class="icon-button small">
+                    <svg class="icon" viewBox="0 0 24 24">
+                        <path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/>
+                    </svg>
+                </button>
+            </div>
+            <div class="overlay-controls-content">
+                <div class="control-group">
+                    <label>Draggable:</label>
+                    <label class="toggle-switch">
+                        <input type="checkbox" id="toggle-draggable" checked>
+                        <span class="toggle-slider"></span>
+                    </label>
+                </div>
+                <div class="control-group">
+                    <label>Opacity:</label>
+                    <input type="range" id="overlay-opacity" min="0.1" max="1" step="0.1" value="0.7">
+                    <span id="opacity-value">70%</span>
+                </div>
+                <div class="control-group">
+                    <button id="reset-overlay" class="control-button">
+                        <svg class="icon" viewBox="0 0 24 24">
+                            <path d="M17.65 6.35C16.2 4.9 14.21 4 12 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08c-.82 2.33-3.04 4-5.65 4-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z"/>
+                        </svg>
+                        Reset Position
+                    </button>
+                </div>
+                <div class="control-group">
+                    <button id="lock-overlay" class="control-button">
+                        <svg class="icon" viewBox="0 0 24 24">
+                            <path d="M18 8h-1V6c0-2.76-2.24-5-5-5S7 3.24 7 6v2H6c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V10c0-1.1-.9-2-2-2zm-6 9c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2zm3.1-9H8.9V6c0-1.71 1.39-3.1 3.1-3.1 1.71 0 3.1 1.39 3.1 3.1v2z"/>
+                        </svg>
+                        Lock Overlay
+                    </button>
+                </div>
+                <div class="hint-text">
+                    <p>• Drag to move overlay</p>
+                    <p>• Pinch to zoom overlay</p>
+                    <p>• Two-finger rotate to rotate</p>
+                    <p>• Double-click to reset</p>
+                    <p>• Wheel to zoom (desktop)</p>
+                </div>
+            </div>
+        `;
+        
+        document.body.appendChild(controls);
+        
+        // Setup control event listeners
+        this.setupControlEventListeners();
+    }
+
+    setupControlEventListeners() {
+        // Toggle draggable
+        const toggleDraggable = document.getElementById('toggle-draggable');
+        if (toggleDraggable) {
+            toggleDraggable.addEventListener('change', (e) => {
+                this.setOverlayDraggable(e.target.checked);
+            });
+        }
+        
+        // Opacity control
+        const opacitySlider = document.getElementById('overlay-opacity');
+        const opacityValue = document.getElementById('opacity-value');
+        if (opacitySlider && opacityValue) {
+            opacitySlider.addEventListener('input', (e) => {
+                const value = Math.round(e.target.value * 100);
+                opacityValue.textContent = `${value}%`;
+                this.setOverlayOpacity(e.target.value);
+            });
+        }
+        
+        // Reset button
+        const resetButton = document.getElementById('reset-overlay');
+        if (resetButton) {
+            resetButton.addEventListener('click', () => {
+                this.resetOverlayPosition();
+                this.vibration.vibrate(50);
+            });
+        }
+        
+        // Lock button
+        const lockButton = document.getElementById('lock-overlay');
+        if (lockButton) {
+            lockButton.addEventListener('click', () => {
+                this.toggleOverlayLock();
+                this.vibration.vibrate(30);
+            });
+        }
+        
+        // Close controls
+        const closeButton = document.getElementById('close-overlay-controls');
+        if (closeButton) {
+            closeButton.addEventListener('click', () => {
+                this.hideOverlayControls();
+            });
+        }
+    }
+
+    setOverlayDraggable(draggable) {
+        this.isOverlayDraggable = draggable;
+        
+        if (this.overlayManager && this.overlayManager.renderer) {
+            this.overlayManager.renderer.setDraggable(draggable);
+        }
+        
+        // Update UI
+        const canvas = document.getElementById('overlay-canvas');
+        if (canvas) {
+            canvas.style.cursor = draggable ? 'grab' : 'default';
+        }
+        
+        this.showToast(draggable ? 'Overlay dragging enabled' : 'Overlay dragging disabled');
+    }
+
+    setOverlayOpacity(opacity) {
+        if (this.overlayManager && this.overlayManager.renderer) {
+            // Store opacity in overlay manager
+            this.overlayManager.setOverlayOpacity(opacity);
+        }
+    }
+
+    resetOverlayPosition() {
+        if (this.overlayManager && this.overlayManager.renderer) {
+            this.overlayManager.renderer.setPosition({
+                offsetX: 0,
+                offsetY: 0,
+                scale: 1.0,
+                rotation: 0
+            });
+            
+            // Save reset position
+            this.overlayManager.saveOverlayPosition({
+                offsetX: 0,
+                offsetY: 0,
+                scale: 1.0,
+                rotation: 0
+            });
+            
+            this.showToast('Overlay position reset');
+        }
+    }
+
+    toggleOverlayLock() {
+        const lockButton = document.getElementById('lock-overlay');
+        if (lockButton) {
+            const isLocked = lockButton.classList.contains('locked');
+            
+            if (isLocked) {
+                // Unlock
+                this.setOverlayDraggable(true);
+                lockButton.classList.remove('locked');
+                lockButton.innerHTML = `
+                    <svg class="icon" viewBox="0 0 24 24">
+                        <path d="M18 8h-1V6c0-2.76-2.24-5-5-5S7 3.24 7 6v2H6c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V10c0-1.1-.9-2-2-2zm-6 9c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2zm3.1-9H8.9V6c0-1.71 1.39-3.1 3.1-3.1 1.71 0 3.1 1.39 3.1 3.1v2z"/>
+                    </svg>
+                    Lock Overlay
+                `;
+                this.showToast('Overlay unlocked');
+            } else {
+                // Lock
+                this.setOverlayDraggable(false);
+                lockButton.classList.add('locked');
+                lockButton.innerHTML = `
+                    <svg class="icon" viewBox="0 0 24 24">
+                        <path d="M18 8h-1V6c0-2.76-2.24-5-5-5S7 3.24 7 6h2c0-1.66 1.34-3 3-3s3 1.34 3 3v2h1c1.1 0 2 .9 2 2v10c0 1.1.9 2 2 2H6c-1.1 0-2-.9-2-2V10c0-1.1.9-2 2-2z"/>
+                    </svg>
+                    Unlock Overlay
+                `;
+                this.showToast('Overlay locked');
+            }
+        }
+    }
+
+    handleOverlayInteraction(isInteracting) {
+        // Show/hide overlay controls based on interaction
+        if (isInteracting) {
+            this.showOverlayControls();
+        }
+        
+        // Update UI elements during interaction
+        const shutterButton = document.getElementById('shutter-button');
+        const switchButton = document.getElementById('switch-camera-button');
+        
+        if (shutterButton) {
+            shutterButton.style.opacity = isInteracting ? '0.5' : '1';
+            shutterButton.style.pointerEvents = isInteracting ? 'none' : 'auto';
+        }
+        
+        if (switchButton) {
+            switchButton.style.opacity = isInteracting ? '0.5' : '1';
+            switchButton.style.pointerEvents = isInteracting ? 'none' : 'auto';
+        }
+    }
+
+    showOverlayControls() {
+        const controls = document.getElementById('overlay-controls');
+        if (controls) {
+            controls.classList.add('visible');
+        }
+    }
+
+    hideOverlayControls() {
+        const controls = document.getElementById('overlay-controls');
+        if (controls) {
+            controls.classList.remove('visible');
+        }
+    }
+
+    showPositionHint(position) {
+        // Create or update position hint
+        let hint = document.getElementById('position-hint');
+        if (!hint) {
+            hint = document.createElement('div');
+            hint.id = 'position-hint';
+            hint.className = 'position-hint';
+            document.body.appendChild(hint);
+        }
+        
+        hint.innerHTML = `
+            <div>X: ${Math.round(position.offsetX)}px</div>
+            <div>Y: ${Math.round(position.offsetY)}px</div>
+            <div>Scale: ${position.scale.toFixed(2)}x</div>
+            <div>Rotation: ${Math.round(position.rotation)}°</div>
+        `;
+        
+        hint.classList.add('visible');
+        
+        // Auto-hide after 2 seconds
+        setTimeout(() => {
+            hint.classList.remove('visible');
+        }, 2000);
     }
 
     updateOverlayList(overlays, activeOverlay) {
@@ -87,6 +353,9 @@ class UIController {
             case 'success':
                 toast.style.background = 'rgba(76, 175, 80, 0.9)';
                 break;
+            case 'warning':
+                toast.style.background = 'rgba(255, 193, 7, 0.9)';
+                break;
             default:
                 toast.style.background = 'rgba(0, 0, 0, 0.8)';
         }
@@ -110,7 +379,6 @@ class UIController {
     }
 
     updateCameraState(state) {
-        // Update UI based on camera state
         const shutterButton = document.getElementById('shutter-button');
         if (shutterButton) {
             shutterButton.dataset.state = state;
