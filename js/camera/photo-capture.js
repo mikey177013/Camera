@@ -20,18 +20,45 @@ class PhotoCapture {
         }
 
         try {
-            // Get video dimensions
+            // Get the current aspect ratio from the camera controller
+            const currentAspectRatio = this.getCurrentAspectRatio();
+            const [ratioW, ratioH] = currentAspectRatio.split(':').map(Number);
+            const targetRatio = ratioW / ratioH;
+            
+            // Get original video dimensions
             const videoWidth = this.videoElement.videoWidth;
             const videoHeight = this.videoElement.videoHeight;
+            const videoAspect = videoWidth / videoHeight;
             
-            // Set canvas to video dimensions
-            this.canvas.width = videoWidth;
-            this.canvas.height = videoHeight;
+            let cropWidth, cropHeight, cropX, cropY;
             
-            // Draw video frame ONLY - NO OVERLAY
-            this.ctx.drawImage(this.videoElement, 0, 0, videoWidth, videoHeight);
+            // Calculate crop area based on target aspect ratio
+            if (videoAspect > targetRatio) {
+                // Video is wider than target - crop width
+                cropHeight = videoHeight;
+                cropWidth = cropHeight * targetRatio;
+                cropX = (videoWidth - cropWidth) / 2;
+                cropY = 0;
+            } else {
+                // Video is taller than target - crop height
+                cropWidth = videoWidth;
+                cropHeight = cropWidth / targetRatio;
+                cropX = 0;
+                cropY = (videoHeight - cropHeight) / 2;
+            }
             
-            // NOTE: OVERLAY IS NOT DRAWN ON THE PHOTO - IT'S JUST A GUIDE
+            // Set canvas to cropped dimensions
+            this.canvas.width = cropWidth;
+            this.canvas.height = cropHeight;
+            
+            // Draw ONLY the cropped video area - NO OVERLAY
+            this.ctx.drawImage(
+                this.videoElement,
+                cropX, cropY, cropWidth, cropHeight, // Source crop
+                0, 0, cropWidth, cropHeight          // Destination
+            );
+            
+            // IMPORTANT: NO OVERLAY IS DRAWN - IT'S JUST A GUIDE FOR THE USER
             
             // Get image data
             const imageData = this.canvas.toDataURL('image/jpeg', 0.92);
@@ -42,14 +69,23 @@ class PhotoCapture {
             // Trigger vibration if available
             this.triggerVibration();
             
-            // Download the photo
-            this.downloadPhoto(imageData);
+            // Download the photo with correct aspect ratio
+            this.downloadPhoto(imageData, currentAspectRatio);
             
             return imageData;
         } catch (error) {
             console.error('Photo capture error:', error);
             throw error;
         }
+    }
+
+    getCurrentAspectRatio() {
+        // Get active aspect ratio from UI
+        const activeBtn = document.querySelector('.aspect-ratio-btn.active');
+        if (activeBtn) {
+            return activeBtn.dataset.ratio || '4:3';
+        }
+        return '4:3';
     }
 
     triggerShutterAnimation() {
@@ -68,9 +104,10 @@ class PhotoCapture {
         }
     }
 
-    downloadPhoto(imageData) {
+    downloadPhoto(imageData, aspectRatio) {
         const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-        const filename = `composition-camera-${timestamp}.jpg`;
+        const aspectLabel = aspectRatio.replace(':', 'x');
+        const filename = `photo_${aspectLabel}_${timestamp}.jpg`;
         
         const link = document.createElement('a');
         link.href = imageData;
@@ -81,8 +118,8 @@ class PhotoCapture {
         link.click();
         document.body.removeChild(link);
         
-        // Show success message
-        this.showToast('Photo saved!');
+        // Show success message with aspect ratio
+        this.showToast(`Photo saved! (${aspectRatio})`);
     }
 
     showToast(message) {
