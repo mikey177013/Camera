@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" style="display: none;">
+  <defs>
+    <!-- Check/Confirm Icon -->
+    <symbol id="icon-check" viewBox="0 0 24 24">
+      <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z" fill="currentColor"/>
+    </symbol>
+    
+    <!-- Check Circle -->
+    <symbol id="icon-check-circle" viewBox="0 0 24 24">
+      <circle cx="12" cy="12" r="10" fill="none" stroke="currentColor" stroke-width="1.5"/>
+      <path d="M9 12l2 2 4-4" stroke="currentColor" stroke-width="2" stroke-linecap="round" fill="none"/>
+    </symbol>
+    
+    <!-- Done/Complete Icon -->
+    <symbol id="icon-done" viewBox="0 0 24 24">
+      <path d="M9 16.2L4.8 12l-1.4 1.4L9 19 21 7l-1.4-1.4L9 16.2z" fill="currentColor"/>
+    </symbol>
+  </defs>
+</svg>
