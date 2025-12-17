@@ -28,13 +28,10 @@ class PhotoCapture {
             this.canvas.width = videoWidth;
             this.canvas.height = videoHeight;
             
-            // Draw video frame
+            // Draw video frame ONLY - NO OVERLAY
             this.ctx.drawImage(this.videoElement, 0, 0, videoWidth, videoHeight);
             
-            // Apply overlay if enabled
-            if (this.overlayManager && this.overlayManager.isOverlayEnabled()) {
-                await this.overlayManager.drawOverlayOnPhoto(this.ctx, videoWidth, videoHeight);
-            }
+            // NOTE: OVERLAY IS NOT DRAWN ON THE PHOTO - IT'S JUST A GUIDE
             
             // Get image data
             const imageData = this.canvas.toDataURL('image/jpeg', 0.92);
