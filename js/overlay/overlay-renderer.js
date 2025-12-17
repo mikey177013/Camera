@@ -9,26 +9,19 @@ class OverlayRenderer {
         this.height = 0;
         
         // Draggable overlay properties
-        this.isDraggable = true; // Enable dragging
-        this.offsetX = 0; // X offset from center
-        this.offsetY = 0; // Y offset from center
-        this.scale = 1.0; // Scale factor
-        this.rotation = 0; // Rotation angle (degrees)
+        this.isDraggable = true;
+        this.offsetX = 0;
+        this.offsetY = 0;
+        this.scale = 1.0;
+        this.rotation = 0;
         
-        // Pinch to zoom properties
-        this.lastTouchDistance = 0;
-        this.lastRotation = 0;
+        // Current aspect ratio
+        this.currentAspectRatio = '4:3';
         
         // Interaction state
         this.isDragging = false;
-        this.isRotating = false;
-        this.isScaling = false;
         this.lastDragX = 0;
         this.lastDragY = 0;
-        
-        // Gesture recognition
-        this.touchStartPoints = [];
-        this.gestureMode = null; // 'drag', 'rotate', 'scale'
         
         this.setupEventListeners();
     }
@@ -56,47 +49,26 @@ class OverlayRenderer {
         
         // Double click to reset
         this.canvas.addEventListener('dblclick', this.handleDoubleClick.bind(this));
+        
+        // Listen for aspect ratio changes
+        document.addEventListener('aspectRatioChanged', (e) => {
+            this.currentAspectRatio = e.detail.ratio;
+            if (this.currentOverlay) {
+                this.render();
+            }
+        });
     }
 
-    // Touch event handlers
     handleTouchStart(e) {
         if (!this.isDraggable || !this.currentOverlay) return;
         
         e.preventDefault();
-        this.touchStartPoints = Array.from(e.touches).map(touch => ({
-            x: touch.clientX,
-            y: touch.clientY,
-            id: touch.identifier
-        }));
-        
         const rect = this.canvas.getBoundingClientRect();
         const touch = e.touches[0];
         
         this.isDragging = true;
         this.lastDragX = touch.clientX - rect.left;
         this.lastDragY = touch.clientY - rect.top;
-        
-        // If two touches, prepare for rotate/scale
-        if (e.touches.length === 2) {
-            const touch1 = e.touches[0];
-            const touch2 = e.touches[1];
-            
-            // Calculate initial distance for scaling
-            this.lastTouchDistance = Math.hypot(
-                touch2.clientX - touch1.clientX,
-                touch2.clientY - touch1.clientY
-            );
-            
-            // Calculate initial angle for rotation
-            this.lastRotation = Math.atan2(
-                touch2.clientY - touch1.clientY,
-                touch2.clientX - touch1.clientX
-            ) * (180 / Math.PI);
-            
-            this.gestureMode = 'multi-touch';
-        } else {
-            this.gestureMode = 'drag';
-        }
         
         this.canvas.style.cursor = 'grabbing';
         this.triggerOverlayInteraction(true);
@@ -107,82 +79,30 @@ class OverlayRenderer {
         
         e.preventDefault();
         const rect = this.canvas.getBoundingClientRect();
+        const touch = e.touches[0];
+        const currentX = touch.clientX - rect.left;
+        const currentY = touch.clientY - rect.top;
         
-        // Single touch - dragging
-        if (e.touches.length === 1 && this.gestureMode === 'drag') {
-            const touch = e.touches[0];
-            const currentX = touch.clientX - rect.left;
-            const currentY = touch.clientY - rect.top;
-            
-            const deltaX = currentX - this.lastDragX;
-            const deltaY = currentY - this.lastDragY;
-            
-            this.offsetX += deltaX;
-            this.offsetY += deltaY;
-            
-            this.lastDragX = currentX;
-            this.lastDragY = currentY;
-            
-            this.render();
-        }
-        // Two touches - rotate and scale
-        else if (e.touches.length === 2 && this.gestureMode === 'multi-touch') {
-            const touch1 = e.touches[0];
-            const touch2 = e.touches[1];
-            
-            // Calculate current distance
-            const currentDistance = Math.hypot(
-                touch2.clientX - touch1.clientX,
-                touch2.clientY - touch1.clientY
-            );
-            
-            // Calculate current angle
-            const currentRotation = Math.atan2(
-                touch2.clientY - touch1.clientY,
-                touch2.clientX - touch1.clientX
-            ) * (180 / Math.PI);
-            
-            // Apply scaling
-            if (this.lastTouchDistance > 0) {
-                const scaleFactor = currentDistance / this.lastTouchDistance;
-                this.scale *= scaleFactor;
-                this.scale = Math.max(0.1, Math.min(3, this.scale)); // Clamp scale
-                this.lastTouchDistance = currentDistance;
-            }
-            
-            // Apply rotation
-            const rotationDelta = currentRotation - this.lastRotation;
-            this.rotation += rotationDelta;
-            this.lastRotation = currentRotation;
-            
-            // Calculate center point for translation during rotate/scale
-            const centerX = (touch1.clientX + touch2.clientX) / 2 - rect.left;
-            const centerY = (touch1.clientY + touch2.clientY) / 2 - rect.top;
-            
-            this.render();
-        }
+        const deltaX = currentX - this.lastDragX;
+        const deltaY = currentY - this.lastDragY;
+        
+        this.offsetX += deltaX;
+        this.offsetY += deltaY;
+        
+        this.lastDragX = currentX;
+        this.lastDragY = currentY;
+        
+        this.render();
     }
 
     handleTouchEnd(e) {
         this.isDragging = false;
-        this.gestureMode = null;
-        this.lastTouchDistance = 0;
-        this.lastRotation = 0;
         this.canvas.style.cursor = 'grab';
         this.triggerOverlayInteraction(false);
         
-        // Save position if overlay manager is available
-        if (window.overlayManager) {
-            window.overlayManager.saveOverlayPosition({
-                offsetX: this.offsetX,
-                offsetY: this.offsetY,
-                scale: this.scale,
-                rotation: this.rotation
-            });
-        }
+        this.savePosition();
     }
 
-    // Mouse event handlers
     handleMouseDown(e) {
         if (!this.isDraggable || !this.currentOverlay) return;
         
@@ -193,7 +113,6 @@ class OverlayRenderer {
         this.lastDragX = e.clientX - rect.left;
         this.lastDragY = e.clientY - rect.top;
         
-        this.gestureMode = 'drag';
         this.canvas.style.cursor = 'grabbing';
         this.triggerOverlayInteraction(true);
     }
@@ -220,19 +139,10 @@ class OverlayRenderer {
 
     handleMouseUp(e) {
         this.isDragging = false;
-        this.gestureMode = null;
         this.canvas.style.cursor = 'grab';
         this.triggerOverlayInteraction(false);
         
-        // Save position if overlay manager is available
-        if (window.overlayManager) {
-            window.overlayManager.saveOverlayPosition({
-                offsetX: this.offsetX,
-                offsetY: this.offsetY,
-                scale: this.scale,
-                rotation: this.rotation
-            });
-        }
+        this.savePosition();
     }
 
     handleWheel(e) {
@@ -240,36 +150,14 @@ class OverlayRenderer {
         
         e.preventDefault();
         
-        // Zoom with wheel
         const zoomIntensity = 0.1;
         const wheelDelta = e.deltaY > 0 ? -zoomIntensity : zoomIntensity;
         
-        // Calculate mouse position relative to canvas
-        const rect = this.canvas.getBoundingClientRect();
-        const mouseX = e.clientX - rect.left;
-        const mouseY = e.clientY - rect.top;
-        
-        // Apply zoom
-        const oldScale = this.scale;
         this.scale += wheelDelta;
-        this.scale = Math.max(0.1, Math.min(3, this.scale)); // Clamp scale
-        
-        // Adjust offset to zoom towards mouse position
-        const scaleChange = this.scale - oldScale;
-        this.offsetX -= (mouseX - this.width/2 - this.offsetX) * (scaleChange / oldScale);
-        this.offsetY -= (mouseY - this.height/2 - this.offsetY) * (scaleChange / oldScale);
+        this.scale = Math.max(0.1, Math.min(3, this.scale));
         
         this.render();
-        
-        // Save position
-        if (window.overlayManager) {
-            window.overlayManager.saveOverlayPosition({
-                offsetX: this.offsetX,
-                offsetY: this.offsetY,
-                scale: this.scale,
-                rotation: this.rotation
-            });
-        }
+        this.savePosition();
     }
 
     handleDoubleClick(e) {
@@ -277,15 +165,23 @@ class OverlayRenderer {
         
         e.preventDefault();
         
-        // Reset overlay to center with default scale
         this.offsetX = 0;
         this.offsetY = 0;
         this.scale = 1.0;
         this.rotation = 0;
         
         this.render();
-        
-        // Save reset position
+        this.savePosition();
+    }
+
+    triggerOverlayInteraction(isInteracting) {
+        const event = new CustomEvent('overlayInteraction', {
+            detail: { interacting: isInteracting }
+        });
+        document.dispatchEvent(event);
+    }
+
+    savePosition() {
         if (window.overlayManager) {
             window.overlayManager.saveOverlayPosition({
                 offsetX: this.offsetX,
@@ -294,13 +190,6 @@ class OverlayRenderer {
                 rotation: this.rotation
             });
         }
-    }
-
-    triggerOverlayInteraction(isInteracting) {
-        const event = new CustomEvent('overlayInteraction', {
-            detail: { interacting: isInteracting }
-        });
-        document.dispatchEvent(event);
     }
 
     async setOverlay(overlaySource) {
@@ -365,6 +254,11 @@ class OverlayRenderer {
         }
     }
 
+    updateAspectRatio(aspectRatio, width, height) {
+        this.currentAspectRatio = aspectRatio;
+        this.updateSize(width, height);
+    }
+
     render() {
         if (!this.overlayImage || !this.ctx || this.width === 0 || this.height === 0) {
             return;
@@ -373,36 +267,65 @@ class OverlayRenderer {
         // Clear canvas
         this.ctx.clearRect(0, 0, this.width, this.height);
         
-        // Calculate image dimensions maintaining aspect ratio
-        const imgAspect = this.overlayImage.width / this.overlayImage.height;
-        const canvasAspect = this.width / this.height;
+        // Calculate the cropped area based on aspect ratio
+        const [ratioW, ratioH] = this.currentAspectRatio.split(':').map(Number);
+        const targetRatio = ratioW / ratioH;
+        const canvasRatio = this.width / this.height;
         
-        let baseWidth, baseHeight;
+        let cropWidth, cropHeight, cropX, cropY;
         
-        if (canvasAspect > imgAspect) {
-            // Canvas is wider than image
-            baseHeight = this.height;
-            baseWidth = baseHeight * imgAspect;
+        if (canvasRatio > targetRatio) {
+            // Canvas is wider than target - black bars on sides
+            cropHeight = this.height;
+            cropWidth = cropHeight * targetRatio;
+            cropX = (this.width - cropWidth) / 2;
+            cropY = 0;
         } else {
-            // Canvas is taller than image
-            baseWidth = this.width;
-            baseHeight = baseWidth / imgAspect;
+            // Canvas is taller than target - black bars on top/bottom
+            cropWidth = this.width;
+            cropHeight = cropWidth / targetRatio;
+            cropX = 0;
+            cropY = (this.height - cropHeight) / 2;
+        }
+        
+        // Calculate overlay dimensions to fit the cropped area
+        const imgAspect = this.overlayImage.width / this.overlayImage.height;
+        const cropAspect = cropWidth / cropHeight;
+        
+        let fitWidth, fitHeight, fitX, fitY;
+        
+        if (cropAspect > imgAspect) {
+            // Crop area is wider than overlay
+            fitHeight = cropHeight;
+            fitWidth = fitHeight * imgAspect;
+            fitX = cropX + (cropWidth - fitWidth) / 2;
+            fitY = cropY;
+        } else {
+            // Crop area is taller than overlay
+            fitWidth = cropWidth;
+            fitHeight = fitWidth / imgAspect;
+            fitX = cropX;
+            fitY = cropY + (cropHeight - fitHeight) / 2;
         }
         
         // Apply scale
-        const scaledWidth = baseWidth * this.scale;
-        const scaledHeight = baseHeight * this.scale;
+        const scaledWidth = fitWidth * this.scale;
+        const scaledHeight = fitHeight * this.scale;
         
-        // Calculate center position
-        const centerX = (this.width - scaledWidth) / 2;
-        const centerY = (this.height - scaledHeight) / 2;
+        // Apply offsets relative to the cropped area
+        const offsetScaleX = scaledWidth / fitWidth;
+        const offsetScaleY = scaledHeight / fitHeight;
         
-        // Apply offsets
-        const drawX = centerX + this.offsetX;
-        const drawY = centerY + this.offsetY;
+        const drawX = fitX + this.offsetX / offsetScaleX;
+        const drawY = fitY + this.offsetY / offsetScaleY;
         
         // Save context state
         this.ctx.save();
+        
+        // Draw only within the cropped area
+        this.ctx.beginPath();
+        this.ctx.rect(cropX, cropY, cropWidth, cropHeight);
+        this.ctx.clip();
         
         // Move to center for rotation
         this.ctx.translate(drawX + scaledWidth / 2, drawY + scaledHeight / 2);
@@ -423,37 +346,37 @@ class OverlayRenderer {
         // Restore context
         this.ctx.restore();
         
+        // Draw crop boundary for visual reference
+        this.drawCropBoundary(cropX, cropY, cropWidth, cropHeight);
+        
         // Draw center marker when interacting
-        if (this.isDragging || this.gestureMode === 'multi-touch') {
-            this.drawCenterMarker();
+        if (this.isDragging) {
+            this.drawCenterMarker(drawX + scaledWidth / 2, drawY + scaledHeight / 2);
         }
     }
 
-    drawCenterMarker() {
+    drawCropBoundary(x, y, width, height) {
+        this.ctx.save();
+        this.ctx.strokeStyle = 'rgba(255, 255, 255, 0.2)';
+        this.ctx.lineWidth = 1;
+        this.ctx.setLineDash([5, 5]);
+        
+        this.ctx.strokeRect(x, y, width, height);
+        this.ctx.restore();
+    }
+
+    drawCenterMarker(centerX, centerY) {
         this.ctx.save();
         this.ctx.strokeStyle = 'rgba(255, 255, 255, 0.8)';
         this.ctx.lineWidth = 2;
-        this.ctx.setLineDash([5, 5]);
+        this.ctx.setLineDash([]);
         
-        // Draw crosshair at current offset position
-        const centerX = this.width / 2 + this.offsetX;
-        const centerY = this.height / 2 + this.offsetY;
-        
-        // Horizontal line
+        // Draw crosshair
         this.ctx.beginPath();
-        this.ctx.moveTo(centerX - 20, centerY);
-        this.ctx.lineTo(centerX + 20, centerY);
-        this.ctx.stroke();
-        
-        // Vertical line
-        this.ctx.beginPath();
-        this.ctx.moveTo(centerX, centerY - 20);
-        this.ctx.lineTo(centerX, centerY + 20);
-        this.ctx.stroke();
-        
-        // Circle
-        this.ctx.beginPath();
-        this.ctx.arc(centerX, centerY, 8, 0, Math.PI * 2);
+        this.ctx.moveTo(centerX - 15, centerY);
+        this.ctx.lineTo(centerX + 15, centerY);
+        this.ctx.moveTo(centerX, centerY - 15);
+        this.ctx.lineTo(centerX, centerY + 15);
         this.ctx.stroke();
         
         this.ctx.restore();
